@@ -14,16 +14,15 @@ import (
 	"github.com/flamego/flamego"
 )
 
-// todo: Json is middleware to deserialize a JSON payload from the request
-// into the struct that is passed in. The resulting struct is then
-// validated, but no error handling is actually performed here.
-// An interface pointer can be added as a second argument in order
-// to map the struct to a specific interface.
+// JSON returns a middleware handler that injects a new instance of the model
+// with populated fields and binding.Errors for possible deserialization,
+// binding, or validation errors into the request context. The model instance
+// fields are populated by deserializing the JSON payload from the request body.
 func JSON(model interface{}) flamego.Handler {
 	ensureNotPointer(model)
 	validate := validator.New()
 	return flamego.ContextInvoker(func(c flamego.Context) {
-		errs := newErrors()
+		errs := NewErrors()
 		obj := reflect.New(reflect.TypeOf(model))
 		r := c.Request().Request
 		if r.Body != nil {
@@ -44,9 +43,8 @@ func ensureNotPointer(model interface{}) {
 	}
 }
 
-// todo: Performs validation and combines errors from validation
-// with errors from deserialization, then maps both the
-// resulting struct and the errors to the context.
+// validateAndMap performs validation and then maps both the model instance and
+// possible errors to the request context.
 func validateAndMap(c flamego.Context, validate *validator.Validate, obj reflect.Value, errs Errors) {
 	err := validate.StructCtx(c.Request().Context(), obj.Interface())
 	if err != nil {
