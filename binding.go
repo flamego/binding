@@ -6,7 +6,6 @@ package binding
 
 import (
 	"encoding/json"
-	"io"
 	"reflect"
 
 	"github.com/go-playground/validator/v10"
@@ -15,21 +14,26 @@ import (
 )
 
 // JSON returns a middleware handler that injects a new instance of the model
-// with populated fields and binding.Errors for possible deserialization,
+// with populated fields and binding.Errors for any deserialization,
 // binding, or validation errors into the request context. The model instance
 // fields are populated by deserializing the JSON payload from the request body.
 func JSON(model interface{}) flamego.Handler {
 	ensureNotPointer(model)
 	validate := validator.New()
 	return flamego.ContextInvoker(func(c flamego.Context) {
-		errs := NewErrors()
+		var errs Errors
 		obj := reflect.New(reflect.TypeOf(model))
 		r := c.Request().Request
 		if r.Body != nil {
 			defer func() { _ = r.Body.Close() }()
 			err := json.NewDecoder(r.Body).Decode(obj.Interface())
-			if err != nil && err != io.EOF {
-				errs.Add(ErrorCategoryDeserialization, err)
+			if err != nil {
+				errs = append(errs,
+					Error{
+						Category: ErrorCategoryDeserialization,
+						Err:      err,
+					},
+				)
 			}
 		}
 		validateAndMap(c, validate, obj, errs)
@@ -44,11 +48,16 @@ func ensureNotPointer(model interface{}) {
 }
 
 // validateAndMap performs validation and then maps both the model instance and
-// possible errors to the request context.
+// any errors to the request context.
 func validateAndMap(c flamego.Context, validate *validator.Validate, obj reflect.Value, errs Errors) {
 	err := validate.StructCtx(c.Request().Context(), obj.Interface())
 	if err != nil {
-		errs.Add(ErrorCategoryValidation, err)
+		errs = append(errs,
+			Error{
+				Category: ErrorCategoryValidation,
+				Err:      err,
+			},
+		)
 	}
-	c.Map(errs, obj.Interface())
+	c.Map(errs, obj.Elem().Interface())
 }

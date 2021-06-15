@@ -26,23 +26,3 @@ type (
 		Err error `json:"error,omitempty"`
 	}
 )
-
-// NewErrors initializes and returns an empty list of Errors.
-func NewErrors() Errors {
-	return make(Errors, 0)
-}
-
-// Add appends the error with given category to the list of Errors.
-func (errs *Errors) Add(category ErrorCategory, err error) {
-	*errs = append(*errs,
-		Error{
-			Category: category,
-			Err:      err,
-		},
-	)
-}
-
-// Len returns the number of Errors.
-func (errs *Errors) Len() int {
-	return len(*errs)
-}
