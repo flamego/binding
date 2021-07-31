@@ -3,3 +3,61 @@
 // license that can be found in the LICENSE file.
 
 package binding
+
+import (
+	"encoding/json"
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
+	"github.com/flamego/flamego"
+)
+
+// JSON returns a middleware handler that injects a new instance of the model
+// with populated fields and binding.Errors for any deserialization,
+// binding, or validation errors into the request context. The model instance
+// fields are populated by deserializing the JSON payload from the request body.
+func JSON(model interface{}) flamego.Handler {
+	ensureNotPointer(model)
+	validate := validator.New()
+	return flamego.ContextInvoker(func(c flamego.Context) {
+		var errs Errors
+		obj := reflect.New(reflect.TypeOf(model))
+		r := c.Request().Request
+		if r.Body != nil {
+			defer func() { _ = r.Body.Close() }()
+			err := json.NewDecoder(r.Body).Decode(obj.Interface())
+			if err != nil {
+				errs = append(errs,
+					Error{
+						Category: ErrorCategoryDeserialization,
+						Err:      err,
+					},
+				)
+			}
+		}
+		validateAndMap(c, validate, obj, errs)
+	})
+}
+
+// ensureNotPointer panics if the given value is a pointer.
+func ensureNotPointer(model interface{}) {
+	if reflect.TypeOf(model).Kind() == reflect.Ptr {
+		panic("binding: pointer can not be accepted as binding model")
+	}
+}
+
+// validateAndMap performs validation and then maps both the model instance and
+// any errors to the request context.
+func validateAndMap(c flamego.Context, validate *validator.Validate, obj reflect.Value, errs Errors) {
+	err := validate.StructCtx(c.Request().Context(), obj.Interface())
+	if err != nil {
+		errs = append(errs,
+			Error{
+				Category: ErrorCategoryValidation,
+				Err:      err,
+			},
+		)
+	}
+	c.Map(errs, obj.Elem().Interface())
+}
