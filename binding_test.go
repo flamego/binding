@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -85,11 +86,63 @@ func TestJSON(t *testing.T) {
 				Age:       17,
 				Email:     "logan.smith@example.com",
 				Addresses: []*address{
-					// todo
+					{
+						Street: "404 Broadway",
+						City:   "Browser",
+						Planet: "Internet",
+						Phone:  "886",
+					},
 				},
 			},
 			assertErrors: func(t *testing.T, errs Errors) {
 				assert.Len(t, errs, 0)
+			},
+		},
+		{
+			name: "required",
+			body: user{
+				LastName: "Smith",
+				Age:      17,
+				Email:    "logan.smith@example.com",
+				Addresses: []*address{
+					{
+						Street: "404 Broadway",
+						City:   "Browser",
+						Planet: "Internet",
+						Phone:  "886",
+					},
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{validation Key: 'user.FirstName' Error:Field validation for 'FirstName' failed on the 'required' tag}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "gte-lte",
+			body: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       140,
+				Email:     "logan.smith@example.com",
+				Addresses: []*address{
+					{
+						Street: "404 Broadway",
+						City:   "Browser",
+						Planet: "Internet",
+						Phone:  "886",
+					},
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{validation Key: 'user.Age' Error:Field validation for 'Age' failed on the 'lte' tag}"
+				assert.Equal(t, want, got)
 			},
 		},
 	}
