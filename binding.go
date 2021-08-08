@@ -13,11 +13,22 @@ import (
 	"github.com/flamego/flamego"
 )
 
+// Options is a struct for specifying configuration options for the binding middleware.
+type Options struct {
+	// CustomErrorHandler will be invoked if errors occurred.
+	CustomErrorHandler func(*flamego.Context, Errors)
+}
+
 // JSON returns a middleware handler that injects a new instance of the model
 // with populated fields and binding.Errors for any deserialization,
 // binding, or validation errors into the request context. The model instance
 // fields are populated by deserializing the JSON payload from the request body.
-func JSON(model interface{}) flamego.Handler {
+func JSON(model interface{}, opts ...Options) flamego.Handler {
+	var option Options
+	if len(opts) == 1 {
+		option = opts[0]
+	}
+
 	ensureNotPointer(model)
 	validate := validator.New()
 	return flamego.ContextInvoker(func(c flamego.Context) {
@@ -37,6 +48,10 @@ func JSON(model interface{}) flamego.Handler {
 			}
 		}
 		validateAndMap(c, validate, obj, errs)
+
+		if option.CustomErrorHandler != nil {
+			_, _ = c.Invoke(option.CustomErrorHandler)
+		}
 	})
 }
 
