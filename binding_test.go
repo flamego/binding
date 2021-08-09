@@ -59,6 +59,61 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, want, got)
 	})
 
+	t.Run("custom error handler", func(t *testing.T) {
+		type form struct {
+			Username string `validate:"required"`
+			Password string `validate:"required"`
+		}
+
+		tests := []struct {
+			name       string
+			payload    []byte
+			statusCode int
+			want       string
+		}{
+			{
+				name:       "invalid JSON",
+				payload:    []byte("{"),
+				statusCode: http.StatusBadRequest,
+				want:       "Oops! Error occurred: unexpected EOF",
+			},
+			{
+				name:       "validation error",
+				payload:    []byte(`{"Username": "alice"}`),
+				statusCode: http.StatusBadRequest,
+				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+			},
+			{
+				name:       "good",
+				payload:    []byte(`{"Username": "alice", "Password": "supersecurepassword"}`),
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				f := flamego.New()
+				opts := Options{
+					ErrorHandler: func(c flamego.Context, errs Errors) {
+						c.ResponseWriter().WriteHeader(http.StatusBadRequest)
+						_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+					},
+				}
+				f.Post("/", JSON(form{}, opts), func(c flamego.Context) {
+					_, _ = c.ResponseWriter().Write([]byte("Hello world"))
+				})
+
+				resp := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer(test.payload))
+				assert.Nil(t, err)
+
+				f.ServeHTTP(resp, req)
+				assert.Equal(t, test.statusCode, resp.Code)
+				assert.Equal(t, test.want, resp.Body.String())
+			})
+		}
+	})
+
 	type address struct {
 		Street string `json:"street" validate:"required"`
 		City   string `json:"city" validate:"required"`
