@@ -94,7 +94,7 @@ func TestJSON(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				f := flamego.New()
 				opts := Options{
-					CustomErrorHandler: func(c flamego.Context, errs Errors) {
+					ErrorHandler: func(c flamego.Context, errs Errors) {
 						c.ResponseWriter().WriteHeader(http.StatusBadRequest)
 						_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
 					},

@@ -50,8 +50,8 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 		validateAndMap(c, validate, obj, errs)
 
 		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
-		if len(errs) > 0 && option.CustomErrorHandler != nil {
-			_, _ = c.Invoke(option.CustomErrorHandler)
+		if len(errs) > 0 && option.ErrorHandler != nil {
+			_, _ = c.Invoke(option.ErrorHandler)
 		}
 	})
 }
