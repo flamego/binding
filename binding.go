@@ -15,8 +15,8 @@ import (
 
 // Options is a struct for specifying configuration options for the binding middleware.
 type Options struct {
-	// CustomErrorHandler will be invoked if errors occurred.
-	CustomErrorHandler func(flamego.Context, Errors)
+	// ErrorHandler will be invoked when errors occurred.
+	ErrorHandler func(flamego.Context, Errors)
 }
 
 // JSON returns a middleware handler that injects a new instance of the model
