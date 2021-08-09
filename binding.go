@@ -51,7 +51,10 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 
 		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
 		if len(errs) > 0 && option.ErrorHandler != nil {
-			_, _ = c.Invoke(option.ErrorHandler)
+			_, err := c.Invoke(option.ErrorHandler)
+			if err != nil {
+				panic("binding: " + err.Error())
+			}
 		}
 	})
 }
