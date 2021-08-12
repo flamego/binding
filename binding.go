@@ -16,7 +16,16 @@ import (
 // Options is a struct for specifying configuration options for the binding middleware.
 type Options struct {
 	// ErrorHandler will be invoked when errors occurred.
-	ErrorHandler func(flamego.Context, Errors)
+	ErrorHandler flamego.Handler
+}
+
+// errorHandlerFuncInvoker is an inject.FastInvoker implementation of
+// `func(flamego.Context, Errors)`.
+type errorHandlerFuncInvoker func(flamego.Context, Errors)
+
+func (invoke errorHandlerFuncInvoker) Invoke(args []interface{}) ([]reflect.Value, error) {
+	invoke(args[0].(flamego.Context), args[1].(Errors))
+	return nil, nil
 }
 
 // JSON returns a middleware handler that injects a new instance of the model
@@ -51,7 +60,14 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 
 		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
 		if len(errs) > 0 && option.ErrorHandler != nil {
-			_, err := c.Invoke(option.ErrorHandler)
+			var err error
+			switch handler := option.ErrorHandler.(type) {
+			case func(flamego.Context, Errors):
+				_, err = c.Invoke(errorHandlerFuncInvoker(handler))
+			default:
+				_, err = c.Invoke(handler)
+			}
+
 			if err != nil {
 				panic("binding: " + err.Error())
 			}
