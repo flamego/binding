@@ -110,6 +110,13 @@ func TestJSON(t *testing.T) {
 				statusCode: http.StatusOK,
 				want:       "Hello world",
 			},
+			{
+				name:       "nil handler",
+				payload:    []byte(`{`),
+				handler:    nil,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
