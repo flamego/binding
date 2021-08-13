@@ -19,11 +19,11 @@ type Options struct {
 	ErrorHandler flamego.Handler
 }
 
-// errorHandlerFuncInvoker is an inject.FastInvoker implementation of
+// errorHandlerInvoker is an inject.FastInvoker implementation of
 // `func(flamego.Context, Errors)`.
-type errorHandlerFuncInvoker func(flamego.Context, Errors)
+type errorHandlerInvoker func(flamego.Context, Errors)
 
-func (invoke errorHandlerFuncInvoker) Invoke(args []interface{}) ([]reflect.Value, error) {
+func (invoke errorHandlerInvoker) Invoke(args []interface{}) ([]reflect.Value, error) {
 	invoke(args[0].(flamego.Context), args[1].(Errors))
 	return nil, nil
 }
@@ -36,6 +36,14 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 	var option Options
 	if len(opts) == 1 {
 		option = opts[0]
+	}
+
+	var errorHandler flamego.Handler
+	switch v := option.ErrorHandler.(type) {
+	case func(flamego.Context, Errors):
+		errorHandler = errorHandlerInvoker(v)
+	default:
+		errorHandler = v
 	}
 
 	ensureNotPointer(model)
@@ -59,15 +67,8 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 		validateAndMap(c, validate, obj, errs)
 
 		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
-		if len(errs) > 0 && option.ErrorHandler != nil {
-			var err error
-			switch handler := option.ErrorHandler.(type) {
-			case func(flamego.Context, Errors):
-				_, err = c.Invoke(errorHandlerFuncInvoker(handler))
-			default:
-				_, err = c.Invoke(handler)
-			}
-
+		if len(errs) > 0 && errorHandler != nil {
+			_, err := c.Invoke(errorHandler)
 			if err != nil {
 				panic("binding: " + err.Error())
 			}
