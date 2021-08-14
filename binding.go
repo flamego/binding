@@ -17,6 +17,8 @@ import (
 type Options struct {
 	// ErrorHandler will be invoked when errors occurred.
 	ErrorHandler flamego.Handler
+	// Validator sets a custom validator instead of the default validator.
+	Validator *validator.Validate
 }
 
 // errorHandlerInvoker is an inject.FastInvoker implementation of
@@ -38,6 +40,10 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 		option = opts[0]
 	}
 
+	if option.Validator == nil {
+		option.Validator = validator.New()
+	}
+
 	var errorHandler flamego.Handler
 	switch v := option.ErrorHandler.(type) {
 	case func(flamego.Context, Errors):
@@ -47,7 +53,7 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 	}
 
 	ensureNotPointer(model)
-	validate := validator.New()
+	validate := option.Validator
 	return flamego.ContextInvoker(func(c flamego.Context) {
 		var errs Errors
 		obj := reflect.New(reflect.TypeOf(model))
