@@ -15,7 +15,46 @@ The minimum requirement of Go is **1.16**.
 
 ## Getting started
 
-TBD
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/flamego/binding"
+	"github.com/flamego/flamego"
+)
+
+type address struct {
+	Street string `json:"street" validate:"required"`
+	City   string `json:"city" validate:"required"`
+	Planet string `json:"planet" validate:"required"`
+	Phone  string `json:"phone" validate:"required"`
+}
+
+type user struct {
+	FirstName string     `json:"first_name" validate:"required"`
+	LastName  string     `json:"last_name" validate:"required"`
+	Age       uint8      `json:"age" validate:"gte=0,lte=130"`
+	Email     string     `json:"email" validate:"required,email"`
+	Addresses []*address `json:"addresses" validate:"required,dive,required"`
+}
+
+func main() {
+	f := flamego.Classic()
+	f.Post("/", binding.JSON(user{}), func(c flamego.Context, form user, errs binding.Errors) {
+		if len(errs) > 0 {
+			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
+			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			return
+		}
+
+		fmt.Printf("Name: %s %s\n", form.FirstName, form.LastName)
+	})
+	f.Run()
+}
+```
 
 ## License
 
