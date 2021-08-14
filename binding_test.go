@@ -65,27 +65,55 @@ func TestJSON(t *testing.T) {
 			Password string `validate:"required"`
 		}
 
+		normalHandler := func(rw http.ResponseWriter, errs Errors) {
+			rw.WriteHeader(http.StatusBadRequest)
+			_, _ = rw.Write([]byte(errs[0].Err.Error()))
+		}
+
+		fastInvokerHandler := func(c flamego.Context, errs Errors) {
+			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
+			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+		}
+
 		tests := []struct {
 			name       string
 			payload    []byte
+			handler    flamego.Handler
 			statusCode int
 			want       string
 		}{
 			{
 				name:       "invalid JSON",
 				payload:    []byte("{"),
+				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
 				want:       "Oops! Error occurred: unexpected EOF",
 			},
 			{
 				name:       "validation error",
 				payload:    []byte(`{"Username": "alice"}`),
+				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
 				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
 			},
 			{
-				name:       "good",
+				name:       "normal handler",
+				payload:    []byte(`{`),
+				handler:    normalHandler,
+				statusCode: http.StatusBadRequest,
+				want:       "unexpected EOF",
+			},
+			{
+				name:       "fast invoker handler",
 				payload:    []byte(`{"Username": "alice", "Password": "supersecurepassword"}`),
+				handler:    fastInvokerHandler,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+			{
+				name:       "nil handler",
+				payload:    []byte(`{`),
+				handler:    nil,
 				statusCode: http.StatusOK,
 				want:       "Hello world",
 			},
@@ -94,10 +122,7 @@ func TestJSON(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				f := flamego.New()
 				opts := Options{
-					ErrorHandler: func(c flamego.Context, errs Errors) {
-						c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-						_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
-					},
+					ErrorHandler: test.handler,
 				}
 				f.Post("/", JSON(form{}, opts), func(c flamego.Context) {
 					_, _ = c.ResponseWriter().Write([]byte("Hello world"))
