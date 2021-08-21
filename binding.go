@@ -8,9 +8,8 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"github.com/go-playground/validator/v10"
-
 	"github.com/flamego/flamego"
+	"github.com/flamego/validator"
 )
 
 // Options is a struct for specifying configuration options for the binding middleware.
