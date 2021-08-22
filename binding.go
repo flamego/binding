@@ -7,6 +7,7 @@ package binding
 import (
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -17,10 +18,15 @@ import (
 
 // Options contains options for binding.JSON, binding.Form middleware.
 type Options struct {
-	// ErrorHandler will be invoked when errors occurred.
+	// ErrorHandler will be invoked automatically when errors occurred. Default is
+	// to do nothing, but handlers may still use binding.Errors and do custom errors
+	// handling.
 	ErrorHandler flamego.Handler
 	// Validator sets a custom validator instead of the default validator.
 	Validator *validator.Validate
+	// MaxMemory specifies the maximum amount of memory to be allowed when parsing a
+	// multipart form. Default is 10 MiB.
+	MaxMemory int64
 }
 
 // errorHandlerInvoker is an inject.FastInvoker implementation of
@@ -63,6 +69,11 @@ func parseOptions(opts Options) Options {
 	if opts.Validator == nil {
 		opts.Validator = validator.New()
 	}
+
+	if opts.MaxMemory <= 0 {
+		opts.MaxMemory = 10 * 1 << 20 // 10 MiB
+	}
+
 	return opts
 }
 
@@ -135,7 +146,7 @@ func Form(model interface{}, opts ...Options) flamego.Handler {
 		}
 
 		obj := reflect.New(reflect.TypeOf(model))
-		errs = mapForm(obj, r.Form, errs)
+		errs = mapForm(obj, r.Form, nil, errs)
 		validateAndMap(c, opt.Validator, obj, errs)
 
 		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
@@ -152,6 +163,7 @@ func Form(model interface{}, opts ...Options) flamego.Handler {
 func mapForm(
 	obj reflect.Value,
 	form url.Values,
+	files map[string][]*multipart.FileHeader,
 	errs Errors,
 ) Errors {
 	if obj.Kind() == reflect.Ptr {
@@ -168,12 +180,12 @@ func mapForm(
 
 		if typeField.Type.Kind() == reflect.Ptr && typeField.Anonymous {
 			structField.Set(reflect.New(typeField.Type.Elem()))
-			errs = mapForm(structField.Elem(), form, errs)
+			errs = mapForm(structField.Elem(), form, files, errs)
 			if reflect.DeepEqual(structField.Elem().Interface(), reflect.Zero(structField.Elem().Type()).Interface()) {
 				structField.Set(reflect.Zero(structField.Type()))
 			}
 		} else if typeField.Type.Kind() == reflect.Struct {
-			errs = mapForm(structField, form, errs)
+			errs = mapForm(structField, form, files, errs)
 		}
 
 		fieldName := typeField.Tag.Get("form")
@@ -201,6 +213,22 @@ func mapForm(
 				}
 			}
 			continue
+		}
+
+		inputFile, exists := files[fieldName]
+		if !exists {
+			continue
+		}
+		fhType := reflect.TypeOf((*multipart.FileHeader)(nil))
+		numElems := len(inputFile)
+		if structField.Kind() == reflect.Slice && numElems > 0 && structField.Type().Elem() == fhType {
+			slice := reflect.MakeSlice(structField.Type(), numElems, numElems)
+			for i := 0; i < numElems; i++ {
+				slice.Index(i).Set(reflect.ValueOf(inputFile[i]))
+			}
+			structField.Set(slice)
+		} else if structField.Type() == fhType {
+			structField.Set(reflect.ValueOf(inputFile[0]))
 		}
 	}
 	return errs
@@ -290,4 +318,62 @@ func setWithProperType(kind reflect.Kind, val string, field reflect.Value, name 
 		field.SetString(val)
 	}
 	return nil
+}
+
+// MultipartForm returns a middleware handler that injects a new instance of the
+// model with populated fields and binding.Errors for any deserialization,
+// binding, or validation errors into the request context. It works much like
+// binding.Form except it can parse multipart forms and handle file uploads.
+func MultipartForm(model interface{}, opts ...Options) flamego.Handler {
+	ensureNotPointer(model)
+
+	var opt Options
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	opt = parseOptions(opt)
+
+	return flamego.ContextInvoker(func(c flamego.Context) {
+		var errs Errors
+		r := c.Request().Request
+
+		// Only parse the form if it has not yet been parsed, see
+		// https://github.com/martini-contrib/csrf/issues/6
+		if r.MultipartForm == nil {
+			mr, err := r.MultipartReader()
+			if err != nil {
+				errs = append(errs,
+					Error{
+						Category: ErrorCategoryDeserialization,
+						Err:      err,
+					},
+				)
+			} else {
+				form, err := mr.ReadForm(opt.MaxMemory)
+				if err != nil {
+					errs = append(errs,
+						Error{
+							Category: ErrorCategoryDeserialization,
+							Err:      err,
+						},
+					)
+				}
+				r.MultipartForm = form
+			}
+		}
+
+		obj := reflect.New(reflect.TypeOf(model))
+		if r.MultipartForm != nil {
+			errs = mapForm(obj, r.MultipartForm.Value, r.MultipartForm.File, errs)
+		}
+		validateAndMap(c, opt.Validator, obj, errs)
+
+		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
+		if len(errs) > 0 && opt.ErrorHandler != nil {
+			_, err := c.Invoke(opt.ErrorHandler)
+			if err != nil {
+				panic("binding.MultipartForm: " + err.Error())
+			}
+		}
+	})
 }

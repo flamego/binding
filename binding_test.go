@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -283,35 +284,35 @@ func TestForm(t *testing.T) {
 
 		tests := []struct {
 			name       string
-			payload    []byte
+			payload    string
 			handler    flamego.Handler
 			statusCode int
 			want       string
 		}{
 			{
 				name:       "validation error",
-				payload:    []byte(`Username=alice`),
+				payload:    `Username=alice`,
 				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
 				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
 			},
 			{
 				name:       "normal handler",
-				payload:    []byte(`Username=alice`),
+				payload:    `Username=alice`,
 				handler:    normalHandler,
 				statusCode: http.StatusBadRequest,
 				want:       "Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
 			},
 			{
 				name:       "fast invoker handler",
-				payload:    []byte(`Username=alice&Password=supersecurepassword`),
+				payload:    `Username=alice&Password=supersecurepassword`,
 				handler:    fastInvokerHandler,
 				statusCode: http.StatusOK,
 				want:       "Hello world",
 			},
 			{
 				name:       "nil handler",
-				payload:    []byte(`Username=alice`),
+				payload:    `Username=alice`,
 				handler:    nil,
 				statusCode: http.StatusOK,
 				want:       "Hello world",
@@ -328,7 +329,7 @@ func TestForm(t *testing.T) {
 				})
 
 				resp := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer(test.payload))
+				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.payload))
 				assert.Nil(t, err)
 
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -602,4 +603,155 @@ func TestForm(t *testing.T) {
 			assert.Equal(t, test.want, gotForm)
 		})
 	}
+}
+
+func TestMultipartForm(t *testing.T) {
+	t.Run("pointer model", func(t *testing.T) {
+		assert.PanicsWithValue(t,
+			"binding: pointer can not be accepted as binding model",
+			func() {
+				type form struct {
+					Username string
+					Password string
+				}
+				MultipartForm(&form{})
+			},
+		)
+	})
+
+	t.Run("custom error handler", func(t *testing.T) {
+		type form struct {
+			Username string `validate:"required"`
+			Password string `validate:"required"`
+		}
+
+		normalHandler := func(rw http.ResponseWriter, errs Errors) {
+			rw.WriteHeader(http.StatusBadRequest)
+			_, _ = rw.Write([]byte(errs[0].Err.Error()))
+		}
+
+		fastInvokerHandler := func(c flamego.Context, errs Errors) {
+			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
+			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+		}
+
+		tests := []struct {
+			name       string
+			fields     map[string]string
+			handler    flamego.Handler
+			statusCode int
+			want       string
+		}{
+			{
+				name: "validation error",
+				fields: map[string]string{
+					"Username": "alice",
+				},
+				handler:    fastInvokerHandler,
+				statusCode: http.StatusBadRequest,
+				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+			},
+			{
+				name: "normal handler",
+				fields: map[string]string{
+					"Username": "alice",
+				},
+				handler:    normalHandler,
+				statusCode: http.StatusBadRequest,
+				want:       "Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+			},
+			{
+				name: "fast invoker handler",
+				fields: map[string]string{
+					"Username": "alice",
+					"Password": "supersecurepassword",
+				},
+				handler:    fastInvokerHandler,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+			{
+				name: "nil handler",
+				fields: map[string]string{
+					"Username": "alice",
+				},
+				handler:    nil,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				f := flamego.New()
+				opts := Options{
+					ErrorHandler: test.handler,
+				}
+				f.Post("/", MultipartForm(form{}, opts), func(c flamego.Context) {
+					_, _ = c.ResponseWriter().Write([]byte("Hello world"))
+				})
+
+				var body bytes.Buffer
+				w := multipart.NewWriter(&body)
+				for k, v := range test.fields {
+					assert.Nil(t, w.WriteField(k, v))
+				}
+				assert.Nil(t, w.Close())
+
+				resp := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodPost, "/", &body)
+				assert.Nil(t, err)
+
+				req.Header.Set("Content-Type", w.FormDataContentType())
+				f.ServeHTTP(resp, req)
+				assert.Equal(t, test.statusCode, resp.Code)
+				assert.Equal(t, test.want, resp.Body.String())
+			})
+		}
+	})
+
+	type profile struct {
+		FirstName  string                  `form:"first_name" validate:"required"`
+		LastName   string                  `form:"last_name" validate:"required"`
+		Background *multipart.FileHeader   `form:"background"`
+		Pictures   []*multipart.FileHeader `form:"picture"`
+	}
+	var gotForm profile
+	var gotErrs Errors
+	f := flamego.New()
+	f.Post("/", MultipartForm(profile{}), func(form profile, errs Errors) {
+		gotForm = form
+		gotErrs = errs
+	})
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	assert.Nil(t, w.WriteField("first_name", "Logan"))
+	assert.Nil(t, w.WriteField("last_name", "Smith"))
+
+	fw, err := w.CreateFormFile("background", "background.jpg")
+	assert.Nil(t, err)
+	_, err = fw.Write([]byte("pretend this is a JPG"))
+	assert.Nil(t, err)
+
+	for _, name := range []string{"picture1.jpg", "picture2.jpg"} {
+		fw, err := w.CreateFormFile("picture", name)
+		assert.Nil(t, err)
+		_, err = fw.Write([]byte("pretend this is a JPG"))
+		assert.Nil(t, err)
+	}
+
+	assert.Nil(t, w.Close())
+
+	resp := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/", &body)
+	assert.Nil(t, err)
+
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	f.ServeHTTP(resp, req)
+
+	assert.Len(t, gotErrs, 0)
+	assert.Equal(t, "Logan", gotForm.FirstName)
+	assert.Equal(t, "Smith", gotForm.LastName)
+	assert.NotNil(t, gotForm.Background)
+	assert.Len(t, gotForm.Pictures, 2)
 }
