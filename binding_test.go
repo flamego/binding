@@ -250,6 +250,100 @@ func TestJSON(t *testing.T) {
 			assert.Equal(t, test.body, gotForm)
 		})
 	}
+
+	t.Run("slice", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			body         []user
+			assertErrors func(t *testing.T, errs Errors)
+		}{
+			{
+				name: "normal",
+				body: []user{
+					{
+						FirstName: "Logan",
+						LastName:  "Smith",
+						Age:       100,
+						Email:     "logan.smith@example.com",
+						Addresses: []*address{
+							{
+								Street: "404 Broadway",
+								City:   "Browser",
+								Planet: "Internet",
+								Phone:  "886",
+							},
+						},
+					},
+					{
+						FirstName: "John",
+						LastName:  "Wu",
+						Age:       21,
+						Email:     "john.wu@example.com",
+						Addresses: []*address{
+							{
+								Street: "404 Broadway",
+								City:   "Browser",
+								Planet: "Internet",
+								Phone:  "233",
+							},
+						},
+					},
+				},
+				assertErrors: func(t *testing.T, errs Errors) {
+					assert.Nil(t, errs)
+				},
+			},
+			{
+				name: "required",
+				body: []user{
+					{
+						LastName: "Smith",
+						Age:      17,
+						Email:    "logan.smith@example.com",
+						Addresses: []*address{
+							{
+								Street: "404 Broadway",
+								City:   "Browser",
+								Planet: "Internet",
+								Phone:  "886",
+							},
+						},
+					},
+				},
+				assertErrors: func(t *testing.T, errs Errors) {
+					assert.Len(t, errs, 1)
+
+					got := fmt.Sprintf("%v", errs[0])
+					want := "{validation Key: '[0].FirstName' Error:Field validation for 'FirstName' failed on the 'required' tag}"
+					assert.Equal(t, want, got)
+				},
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				encoded, err := json.Marshal(test.body)
+				assert.Nil(t, err)
+
+				var gotForm []user
+				var gotErrs Errors
+				f := flamego.New()
+				f.Post("/", JSON([]user{}), func(form []user, errs Errors) {
+					gotForm = form
+					gotErrs = errs
+				})
+
+				resp := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer(encoded))
+				assert.Nil(t, err)
+
+				f.ServeHTTP(resp, req)
+
+				test.assertErrors(t, gotErrs)
+				assert.Equal(t, test.body, gotForm)
+			})
+		}
+	})
 }
 
 func TestForm(t *testing.T) {

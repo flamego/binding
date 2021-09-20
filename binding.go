@@ -48,7 +48,7 @@ func ensureNotPointer(model interface{}) {
 // validateAndMap performs validation and then maps both the model instance and
 // any errors to the request context.
 func validateAndMap(c flamego.Context, validate *validator.Validate, obj reflect.Value, errs Errors) {
-	err := validate.StructCtx(c.Request().Context(), obj.Interface())
+	err := validate.VarCtx(c.Request().Context(), obj.Interface(), "dive")
 	if err != nil {
 		errs = append(errs,
 			Error{
