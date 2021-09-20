@@ -314,7 +314,7 @@ func TestJSON(t *testing.T) {
 					assert.Len(t, errs, 1)
 
 					got := fmt.Sprintf("%v", errs[0])
-					want := "{validation Key: '[0].FirstName' Error:Field validation for 'FirstName' failed on the 'required' tag}"
+					want := `{validation Key: "[0].FirstName" Error: Field validation for "FirstName" failed on the "required" tag}`
 					assert.Equal(t, want, got)
 				},
 			},
