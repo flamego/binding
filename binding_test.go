@@ -95,7 +95,7 @@ func TestJSON(t *testing.T) {
 				payload:    []byte(`{"Username": "alice"}`),
 				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
-				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+				want:       `Oops! Error occurred: Key: "form.Password" Error: Field validation for "Password" failed on the "required" tag`,
 			},
 			{
 				name:       "normal handler",
@@ -198,7 +198,7 @@ func TestJSON(t *testing.T) {
 				assert.Len(t, errs, 1)
 
 				got := fmt.Sprintf("%v", errs[0])
-				want := "{validation Key: 'user.FirstName' Error:Field validation for 'FirstName' failed on the 'required' tag}"
+				want := `{validation Key: "user.FirstName" Error: Field validation for "FirstName" failed on the "required" tag}`
 				assert.Equal(t, want, got)
 			},
 		},
@@ -222,7 +222,7 @@ func TestJSON(t *testing.T) {
 				assert.Len(t, errs, 1)
 
 				got := fmt.Sprintf("%v", errs[0])
-				want := "{validation Key: 'user.Age' Error:Field validation for 'Age' failed on the 'lte' tag}"
+				want := `{validation Key: "user.Age" Error: Field validation for "Age" failed on the "lte" tag}`
 				assert.Equal(t, want, got)
 			},
 		},
@@ -294,14 +294,14 @@ func TestForm(t *testing.T) {
 				payload:    `Username=alice`,
 				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
-				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+				want:       `Oops! Error occurred: Key: "form.Password" Error: Field validation for "Password" failed on the "required" tag`,
 			},
 			{
 				name:       "normal handler",
 				payload:    `Username=alice`,
 				handler:    normalHandler,
 				statusCode: http.StatusBadRequest,
-				want:       "Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+				want:       `Key: "form.Password" Error: Field validation for "Password" failed on the "required" tag`,
 			},
 			{
 				name:       "fast invoker handler",
@@ -649,7 +649,7 @@ func TestMultipartForm(t *testing.T) {
 				},
 				handler:    fastInvokerHandler,
 				statusCode: http.StatusBadRequest,
-				want:       "Oops! Error occurred: Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+				want:       `Oops! Error occurred: Key: "form.Password" Error: Field validation for "Password" failed on the "required" tag`,
 			},
 			{
 				name: "normal handler",
@@ -658,7 +658,7 @@ func TestMultipartForm(t *testing.T) {
 				},
 				handler:    normalHandler,
 				statusCode: http.StatusBadRequest,
-				want:       "Key: 'form.Password' Error:Field validation for 'Password' failed on the 'required' tag",
+				want:       `Key: "form.Password" Error: Field validation for "Password" failed on the "required" tag`,
 			},
 			{
 				name: "fast invoker handler",
