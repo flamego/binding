@@ -3,8 +3,8 @@ module github.com/flamego/binding
 go 1.16
 
 require (
-	github.com/flamego/flamego v0.0.0-20210525090435-cdb552aa0e32
-	github.com/flamego/validator v0.0.0-20210920053956-d830f2bfdff6
+	github.com/flamego/flamego v1.0.0
+	github.com/flamego/validator v1.0.0
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/stretchr/testify v1.7.0
