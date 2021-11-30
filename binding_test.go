@@ -367,11 +367,11 @@ func TestYAML(t *testing.T) {
 		}
 		normalHandler := func(rw http.ResponseWriter, errs Errors) {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(errs[0].Err.Error()))
+			_, _ = rw.Write([]byte(errs[0].Err.Error()))
 		}
 		fastInvokerHandler := func(c flamego.Context, errs Errors) {
 			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-			c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
 		}
 		tests := []struct {
 			name       string
