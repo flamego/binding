@@ -346,6 +346,93 @@ func TestJSON(t *testing.T) {
 	})
 }
 
+func TestYaml(t *testing.T) {
+	t.Run("pointer model", func(t *testing.T) {
+		assert.PanicsWithValue(t,
+			"binding: pointer can not be accepted as binding model",
+			func() {
+				type yaml struct {
+					Username string
+					Password string
+				}
+				Yaml(&yaml{})
+			},
+		)
+	})
+
+	t.Run("custom error handler", func(t *testing.T) {
+		type yaml struct {
+			Username string `validate:"required" yaml:"Username"`
+			Password string `validate:"required" yaml:"Password"`
+		}
+		normalHandler := func(rw http.ResponseWriter, errs Errors) {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(errs[0].Err.Error()))
+		}
+		fastInvokerHandler := func(c flamego.Context, errs Errors) {
+			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
+			c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+		}
+		tests := []struct {
+			name       string
+			payload    string
+			handler    flamego.Handler
+			statusCode int
+			want       string
+		}{
+			{
+				name:       "validation error",
+				payload:    `Username: alice`,
+				handler:    fastInvokerHandler,
+				statusCode: http.StatusBadRequest,
+				want:       `Oops! Error occurred: Key: "yaml.Password" Error: Field validation for "Password" failed on the "required" tag`,
+			},
+			{
+				name:       "normal handler",
+				payload:    `Username: alice`,
+				handler:    normalHandler,
+				statusCode: http.StatusBadRequest,
+				want:       `Key: "yaml.Password" Error: Field validation for "Password" failed on the "required" tag`,
+			},
+			{
+				name: "fast invoker handler",
+				payload: `Username: alice
+							handler:    fastInvokerHandler,
+			Password: supersecurepassword`,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+			{
+				name:       "nil handler",
+				payload:    `Username: alice`,
+				handler:    nil,
+				statusCode: http.StatusOK,
+				want:       "Hello world",
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				f := flamego.New()
+				opts := Options{
+					ErrorHandler: test.handler,
+				}
+				f.Post("/", Yaml(yaml{}, opts), func(c flamego.Context) {
+					_, _ = c.ResponseWriter().Write([]byte("Hello world"))
+				})
+
+				resp := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.payload))
+				assert.Nil(t, err)
+
+				req.Header.Set("Content-Type", "application/x-yaml")
+				f.ServeHTTP(resp, req)
+				assert.Equal(t, test.statusCode, resp.Code)
+				assert.Equal(t, test.want, resp.Body.String())
+			})
+		}
+	})
+}
+
 func TestForm(t *testing.T) {
 	t.Run("pointer model", func(t *testing.T) {
 		assert.PanicsWithValue(t,
