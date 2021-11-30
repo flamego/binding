@@ -119,11 +119,11 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 	})
 }
 
-// Yaml returns a middleware handler that injects a new instance of the model
+// YAML returns a middleware handler that injects a new instance of the model
 // with populated fields and binding.Errors for any deserialization, binding, or
 // validation errors into the request context. The model instance fields are
-// populated by deserializing the Yaml payload from the request body.
-func Yaml(model interface{}, opts ...Options) flamego.Handler {
+// populated by deserializing the YAML payload from the request body.
+func YAML(model interface{}, opts ...Options) flamego.Handler {
 	ensureNotPointer(model)
 	var opt Options
 	if len(opts) > 0 {
@@ -152,7 +152,7 @@ func Yaml(model interface{}, opts ...Options) flamego.Handler {
 		if len(errs) > 0 && opt.ErrorHandler != nil {
 			_, err := c.Invoke(opt.ErrorHandler)
 			if err != nil {
-				panic("binding.Yaml: " + err.Error())
+				panic("binding.YAML: " + err.Error())
 			}
 		}
 	})

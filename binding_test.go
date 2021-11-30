@@ -346,16 +346,16 @@ func TestJSON(t *testing.T) {
 	})
 }
 
-func TestYaml(t *testing.T) {
+func TestYAML(t *testing.T) {
 	t.Run("pointer model", func(t *testing.T) {
 		assert.PanicsWithValue(t,
 			"binding: pointer can not be accepted as binding model",
 			func() {
 				type yaml struct {
-					Username string
-					Password string
+					Username string `yaml:"Username"`
+					Password string `yaml:"Password"`
 				}
-				Yaml(&yaml{})
+				YAML(&yaml{})
 			},
 		)
 	})
@@ -397,8 +397,8 @@ func TestYaml(t *testing.T) {
 			{
 				name: "fast invoker handler",
 				payload: `Username: alice
-							handler:    fastInvokerHandler,
-			Password: supersecurepassword`,
+Password: supersecurepassword`,
+				handler:    fastInvokerHandler,
 				statusCode: http.StatusOK,
 				want:       "Hello world",
 			},
@@ -416,7 +416,7 @@ func TestYaml(t *testing.T) {
 				opts := Options{
 					ErrorHandler: test.handler,
 				}
-				f.Post("/", Yaml(yaml{}, opts), func(c flamego.Context) {
+				f.Post("/", YAML(yaml{}, opts), func(c flamego.Context) {
 					_, _ = c.ResponseWriter().Write([]byte("Hello world"))
 				})
 
