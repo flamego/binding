@@ -12,6 +12,8 @@ import (
 	"reflect"
 	"strconv"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/flamego/flamego"
 	"github.com/flamego/validator"
 )
@@ -113,6 +115,45 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 			_, err := c.Invoke(opt.ErrorHandler)
 			if err != nil {
 				panic("binding.JSON: " + err.Error())
+			}
+		}
+	})
+}
+
+// YAML returns a middleware handler that injects a new instance of the model
+// with populated fields and binding.Errors for any deserialization, binding, or
+// validation errors into the request context. The model instance fields are
+// populated by deserializing the YAML payload from the request body.
+func YAML(model interface{}, opts ...Options) flamego.Handler {
+	ensureNotPointer(model)
+	var opt Options
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	opt = parseOptions(opt)
+
+	return flamego.ContextInvoker(func(c flamego.Context) {
+		var errs Errors
+		r := c.Request().Request
+		obj := reflect.New(reflect.TypeOf(model))
+		if r.Body != nil {
+			defer func() { _ = r.Body.Close() }()
+			err := yaml.NewDecoder(r.Body).Decode(obj.Interface())
+			if err != nil {
+				errs = append(errs,
+					Error{
+						Category: ErrorCategoryDeserialization,
+						Err:      err,
+					},
+				)
+			}
+		}
+		validateAndMap(c, opt.Validator, obj, errs)
+		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
+		if len(errs) > 0 && opt.ErrorHandler != nil {
+			_, err := c.Invoke(opt.ErrorHandler)
+			if err != nil {
+				panic("binding.YAML: " + err.Error())
 			}
 		}
 	})
