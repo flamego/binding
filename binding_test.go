@@ -381,6 +381,13 @@ func TestYAML(t *testing.T) {
 			want       string
 		}{
 			{
+				name:       "invalid YAML",
+				payload:    "Username=alice",
+				handler:    fastInvokerHandler,
+				statusCode: http.StatusBadRequest,
+				want:       "Oops! Error occurred: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `Usernam...` into binding.yaml",
+			},
+			{
 				name:       "validation error",
 				payload:    `Username: alice`,
 				handler:    fastInvokerHandler,
@@ -431,6 +438,365 @@ Password: supersecurepassword`,
 			})
 		}
 	})
+	type address struct {
+		Street string `yaml:"street" validate:"required"`
+		City   string `yaml:"city" validate:"required"`
+		Planet string `yaml:"planet" validate:"required"`
+		Phone  string `yaml:"phone" validate:"required"`
+	}
+	type user struct {
+		FirstName string   `yaml:"first_name" validate:"required"`
+		LastName  string   `yaml:"last_name" validate:"required"`
+		Age       uint8    `yaml:"age" validate:"gte=0,lte=130"`
+		Height    int      `yaml:"height" validate:"gte=0"`
+		Male      bool     `yaml:"male"`
+		Email     string   `yaml:"email" validate:"required,email"`
+		Weight    float32  `yaml:"weight" validate:"gte=0"`
+		Balance   float64  `yaml:"balance"`
+		Address   address  `yaml:"address" validate:"required,dive,required"`
+		IPs       []string `yaml:"ip" validate:"dive,ip"`
+	}
+
+	tests := []struct {
+		name         string
+		body         string
+		want         user
+		assertErrors func(t *testing.T, errs Errors)
+	}{
+		{
+			name: "good",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: 170
+male: true
+email: logan.smith@example.com
+weight: 60.7
+balance: -12.4
+address:
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886
+ip: ['192.168.1.1']`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    170,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+				IPs: []string{"192.168.1.1"},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 0)
+			},
+		},
+		{
+			name: "bad int",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: bad
+male: true
+email: logan.smith@example.com
+weight: 60.7
+balance: -12.4
+address: 
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    0,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{deserialization yaml: unmarshal errors:\n  line 5: cannot unmarshal !!str `bad` into int}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "bad uint",
+			body: `
+first_name: Logan
+last_name: Smith
+age: bad
+height: 170
+male: true
+email: logan.smith@example.com
+weight: 60.7
+balance: -12.4
+address: 
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       0,
+				Height:    170,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{deserialization yaml: unmarshal errors:\n  line 4: cannot unmarshal !!str `bad` into uint8}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "bad bool",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: 170
+male: bad
+email: logan.smith@example.com
+weight: 60.7
+balance: -12.4
+address: 
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    170,
+				Male:      false,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{deserialization yaml: unmarshal errors:\n  line 6: cannot unmarshal !!str `bad` into bool}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "bad float32",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: 170
+male: true
+email: logan.smith@example.com
+weight: bad
+balance: -12.4
+address:
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    170,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    0,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{deserialization yaml: unmarshal errors:\n  line 8: cannot unmarshal !!str `bad` into float32}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "bad float64",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: 170
+male: true
+email: logan.smith@example.com
+weight: 60.7
+balance: bad
+address:
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    170,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   0,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 1)
+
+				got := fmt.Sprintf("%v", errs[0])
+				want := "{deserialization yaml: unmarshal errors:\n  line 9: cannot unmarshal !!str `bad` into float64}"
+				assert.Equal(t, want, got)
+			},
+		},
+		{
+			name: "default values",
+			body: `
+first_name: Logan
+last_name: Smith
+age:
+height: 
+male: 
+email: logan.smith@example.com
+weight: 
+balance:
+address:
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       0,
+				Height:    0,
+				Male:      false,
+				Email:     "logan.smith@example.com",
+				Weight:    0,
+				Balance:   0,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 0)
+			},
+		},
+		{
+			name: "bool on",
+			body: `
+first_name: Logan
+last_name: Smith
+age: 17
+height: 170
+male: on
+email: logan.smith@example.com
+weight: 60.7
+balance: -12.4
+address: 
+  street: 404 Broadway
+  city: Browser
+  planet: Internet
+  phone: 886
+ip: ['192.168.1.1']`,
+			want: user{
+				FirstName: "Logan",
+				LastName:  "Smith",
+				Age:       17,
+				Height:    170,
+				Male:      true,
+				Email:     "logan.smith@example.com",
+				Weight:    60.7,
+				Balance:   -12.4,
+				Address: address{
+					Street: "404 Broadway",
+					City:   "Browser",
+					Planet: "Internet",
+					Phone:  "886",
+				},
+				IPs: []string{"192.168.1.1"},
+			},
+			assertErrors: func(t *testing.T, errs Errors) {
+				assert.Len(t, errs, 0)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var gotForm user
+			var gotErrs Errors
+			f := flamego.New()
+			f.Post("/", YAML(user{}), func(form user, errs Errors) {
+				gotForm = form
+				gotErrs = errs
+			})
+
+			resp := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.body))
+			assert.Nil(t, err)
+
+			req.Header.Set("Content-Type", "application/x-yaml")
+			f.ServeHTTP(resp, req)
+
+			test.assertErrors(t, gotErrs)
+			assert.Equal(t, test.want, gotForm)
+		})
+	}
 }
 
 func TestForm(t *testing.T) {
