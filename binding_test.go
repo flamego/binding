@@ -457,12 +457,15 @@ Password: supersecurepassword`,
 				resp := httptest.NewRecorder()
 				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.payload))
 				assert.Nil(t, err)
+
 				f.ServeHTTP(resp, req)
+
 				assert.Equal(t, test.statusCode, resp.Code)
 				assert.Equal(t, test.want, resp.Body.String())
 			})
 		}
 	})
+
 	type address struct {
 		Street string `yaml:"street" validate:"required"`
 		City   string `yaml:"city" validate:"required"`
@@ -814,7 +817,9 @@ ip: ['192.168.1.1']`,
 			resp := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.body))
 			assert.Nil(t, err)
+
 			f.ServeHTTP(resp, req)
+
 			test.assertErrors(t, gotErrs)
 			assert.Equal(t, test.want, gotForm)
 		})
