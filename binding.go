@@ -12,9 +12,10 @@ import (
 	"reflect"
 	"strconv"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/flamego/flamego"
 	"github.com/flamego/validator"
-	"gopkg.in/yaml.v3"
 )
 
 // Options contains options for binding.JSON, binding.Form middleware.

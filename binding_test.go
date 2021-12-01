@@ -360,6 +360,33 @@ func TestYAML(t *testing.T) {
 		)
 	})
 
+	t.Run("invalid YAML", func(t *testing.T) {
+		type body struct {
+			Username string `yaml:"username"`
+			Password string `yaml:"password"`
+		}
+
+		var got Errors
+		f := flamego.New()
+		f.Post("/", YAML(body{}), func(errs Errors) {
+			got = errs
+		})
+
+		resp := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{`))
+		assert.Nil(t, err)
+
+		f.ServeHTTP(resp, req)
+
+		want := Errors{
+			{
+				Category: ErrorCategoryDeserialization,
+				Err:      errors.New("yaml: line 1: did not find expected node content"),
+			},
+		}
+		assert.Equal(t, want, got)
+	})
+
 	t.Run("custom error handler", func(t *testing.T) {
 		type yaml struct {
 			Username string `validate:"required" yaml:"Username"`
@@ -430,8 +457,6 @@ Password: supersecurepassword`,
 				resp := httptest.NewRecorder()
 				req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.payload))
 				assert.Nil(t, err)
-
-				req.Header.Set("Content-Type", "application/x-yaml")
 				f.ServeHTTP(resp, req)
 				assert.Equal(t, test.statusCode, resp.Code)
 				assert.Equal(t, test.want, resp.Body.String())
@@ -789,10 +814,7 @@ ip: ['192.168.1.1']`,
 			resp := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.body))
 			assert.Nil(t, err)
-
-			req.Header.Set("Content-Type", "application/x-yaml")
 			f.ServeHTTP(resp, req)
-
 			test.assertErrors(t, gotErrs)
 			assert.Equal(t, test.want, gotForm)
 		})
