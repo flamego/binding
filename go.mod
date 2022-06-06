@@ -3,7 +3,7 @@ module github.com/flamego/binding
 go 1.16
 
 require (
-	github.com/flamego/flamego v1.2.1
+	github.com/flamego/flamego v1.4.0
 	github.com/flamego/validator v1.0.0
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
