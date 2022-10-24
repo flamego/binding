@@ -9,7 +9,7 @@ Package binding is a middleware that provides request data binding and validatio
 
 ## Installation
 
-The minimum requirement of Go is **1.16**.
+The minimum requirement of Go is **1.18**.
 
 	go get github.com/flamego/binding
 
