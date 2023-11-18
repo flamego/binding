@@ -418,3 +418,65 @@ func MultipartForm(model interface{}, opts ...Options) flamego.Handler {
 		}
 	})
 }
+
+func mapQuery(obj reflect.Value, values url.Values, errs Errors) Errors {
+	for i := 0; i < obj.Elem().NumField(); i++ {
+		f := obj.Elem().Field(i)
+		t := obj.Elem().Type().Field(i)
+
+		if f.Kind() == reflect.Struct && t.Anonymous {
+			errs = mapQuery(f.Addr(), values, errs)
+			continue
+		}
+
+		tag := t.Tag.Get("query")
+		if tag == "-" {
+			continue
+		}
+
+		if tag == "" {
+			tag = t.Name
+		}
+
+		if !f.CanSet() {
+			continue
+		}
+
+		vals := values[tag]
+		if len(vals) == 0 {
+			continue
+		}
+
+		err := setWithProperType(f.Kind(), vals[0], f, tag)
+		if err != nil {
+			errs = append(errs, *err)
+		}
+	}
+
+	return errs
+}
+
+func Query(model interface{}, opts ...Options) flamego.Handler {
+	ensureNotPointer(model)
+
+	var opt Options
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	opt = parseOptions(opt)
+
+	return flamego.ContextInvoker(func(c flamego.Context) {
+		var errs Errors
+		r := c.Request().Request
+		obj := reflect.New(reflect.TypeOf(model))
+		errs = mapQuery(obj, r.URL.Query(), errs)
+		validateAndMap(c, opt.Validator, obj, errs)
+		errs = c.Value(reflect.TypeOf(errs)).Interface().(Errors)
+		if len(errs) > 0 && opt.ErrorHandler != nil {
+			_, err := c.Invoke(opt.ErrorHandler)
+			if err != nil {
+				panic("binding.Query: " + err.Error())
+			}
+		}
+	})
+}
