@@ -3,7 +3,7 @@ module github.com/flamego/binding
 go 1.18
 
 require (
-	github.com/flamego/flamego v1.9.5
+	github.com/flamego/flamego v1.9.6
 	github.com/flamego/validator v1.0.0
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
