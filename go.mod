@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/flamego/flamego v1.9.7
 	github.com/flamego/validator v1.0.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
