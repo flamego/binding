@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/flamego/flamego"
-	"github.com/flamego/validator"
+	"github.com/go-playground/validator/v10"
 )
 
 // Options contains options for binding.JSON, binding.Form middleware.
