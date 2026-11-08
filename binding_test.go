@@ -73,7 +73,7 @@ func TestJSON(t *testing.T) {
 
 		fastInvokerHandler := func(c flamego.Context, errs Errors) {
 			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			_, _ = fmt.Fprintf(c.ResponseWriter(), "Oops! Error occurred: %v", errs[0].Err)
 		}
 
 		tests := []struct {
@@ -398,7 +398,7 @@ func TestYAML(t *testing.T) {
 		}
 		fastInvokerHandler := func(c flamego.Context, errs Errors) {
 			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			_, _ = fmt.Fprintf(c.ResponseWriter(), "Oops! Error occurred: %v", errs[0].Err)
 		}
 		tests := []struct {
 			name       string
@@ -853,7 +853,7 @@ func TestForm(t *testing.T) {
 
 		fastInvokerHandler := func(c flamego.Context, errs Errors) {
 			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			_, _ = fmt.Fprintf(c.ResponseWriter(), "Oops! Error occurred: %v", errs[0].Err)
 		}
 
 		tests := []struct {
@@ -1206,7 +1206,7 @@ func TestMultipartForm(t *testing.T) {
 
 		fastInvokerHandler := func(c flamego.Context, errs Errors) {
 			c.ResponseWriter().WriteHeader(http.StatusBadRequest)
-			_, _ = c.ResponseWriter().Write([]byte(fmt.Sprintf("Oops! Error occurred: %v", errs[0].Err)))
+			_, _ = fmt.Fprintf(c.ResponseWriter(), "Oops! Error occurred: %v", errs[0].Err)
 		}
 
 		tests := []struct {

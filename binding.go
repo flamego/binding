@@ -42,7 +42,7 @@ func (invoke errorHandlerInvoker) Invoke(args []interface{}) ([]reflect.Value, e
 
 // ensureNotPointer panics if the given value is a pointer.
 func ensureNotPointer(model interface{}) {
-	if reflect.TypeOf(model).Kind() == reflect.Ptr {
+	if reflect.TypeOf(model).Kind() == reflect.Pointer {
 		panic("binding: pointer can not be accepted as binding model")
 	}
 }
@@ -207,7 +207,7 @@ func mapForm(
 	files map[string][]*multipart.FileHeader,
 	errs Errors,
 ) Errors {
-	if obj.Kind() == reflect.Ptr {
+	if obj.Kind() == reflect.Pointer {
 		obj = obj.Elem()
 	}
 	typ := obj.Type()
@@ -219,7 +219,7 @@ func mapForm(
 			continue
 		}
 
-		if typeField.Type.Kind() == reflect.Ptr && typeField.Anonymous {
+		if typeField.Type.Kind() == reflect.Pointer && typeField.Anonymous {
 			structField.Set(reflect.New(typeField.Type.Elem()))
 			errs = mapForm(structField.Elem(), form, files, errs)
 			if reflect.DeepEqual(structField.Elem().Interface(), reflect.Zero(structField.Elem().Type()).Interface()) {
