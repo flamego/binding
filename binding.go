@@ -35,13 +35,13 @@ type Options struct {
 // `func(flamego.Context, Errors)`.
 type errorHandlerInvoker func(flamego.Context, Errors)
 
-func (invoke errorHandlerInvoker) Invoke(args []interface{}) ([]reflect.Value, error) {
+func (invoke errorHandlerInvoker) Invoke(args []any) ([]reflect.Value, error) {
 	invoke(args[0].(flamego.Context), args[1].(Errors))
 	return nil, nil
 }
 
 // ensureNotPointer panics if the given value is a pointer.
-func ensureNotPointer(model interface{}) {
+func ensureNotPointer(model any) {
 	if reflect.TypeOf(model).Kind() == reflect.Pointer {
 		panic("binding: pointer can not be accepted as binding model")
 	}
@@ -83,7 +83,7 @@ func parseOptions(opts Options) Options {
 // with populated fields and binding.Errors for any deserialization, binding, or
 // validation errors into the request context. The model instance fields are
 // populated by deserializing the JSON payload from the request body.
-func JSON(model interface{}, opts ...Options) flamego.Handler {
+func JSON(model any, opts ...Options) flamego.Handler {
 	ensureNotPointer(model)
 
 	var opt Options
@@ -124,7 +124,7 @@ func JSON(model interface{}, opts ...Options) flamego.Handler {
 // with populated fields and binding.Errors for any deserialization, binding, or
 // validation errors into the request context. The model instance fields are
 // populated by deserializing the YAML payload from the request body.
-func YAML(model interface{}, opts ...Options) flamego.Handler {
+func YAML(model any, opts ...Options) flamego.Handler {
 	ensureNotPointer(model)
 	var opt Options
 	if len(opts) > 0 {
@@ -164,7 +164,7 @@ func YAML(model interface{}, opts ...Options) flamego.Handler {
 // validation errors into the request context. The model instance fields are
 // populated by deserializing the payload from both form-urlencoded data request
 // body and URL query parameters.
-func Form(model interface{}, opts ...Options) flamego.Handler {
+func Form(model any, opts ...Options) flamego.Handler {
 	ensureNotPointer(model)
 
 	var opt Options
@@ -240,7 +240,7 @@ func mapForm(
 			if structField.Kind() == reflect.Slice && numElems > 0 {
 				sliceOf := structField.Type().Elem().Kind()
 				slice := reflect.MakeSlice(structField.Type(), numElems, numElems)
-				for i := 0; i < numElems; i++ {
+				for i := range numElems {
 					err := setWithProperType(sliceOf, inputValue[i], slice.Index(i), fieldName)
 					if err != nil {
 						errs = append(errs, *err)
@@ -260,11 +260,11 @@ func mapForm(
 		if !exists {
 			continue
 		}
-		fhType := reflect.TypeOf((*multipart.FileHeader)(nil))
+		fhType := reflect.TypeFor[*multipart.FileHeader]()
 		numElems := len(inputFile)
 		if structField.Kind() == reflect.Slice && numElems > 0 && structField.Type().Elem() == fhType {
 			slice := reflect.MakeSlice(structField.Type(), numElems, numElems)
-			for i := 0; i < numElems; i++ {
+			for i := range numElems {
 				slice.Index(i).Set(reflect.ValueOf(inputFile[i]))
 			}
 			structField.Set(slice)
@@ -365,7 +365,7 @@ func setWithProperType(kind reflect.Kind, val string, field reflect.Value, name 
 // model with populated fields and binding.Errors for any deserialization,
 // binding, or validation errors into the request context. It works much like
 // binding.Form except it can parse multipart forms and handle file uploads.
-func MultipartForm(model interface{}, opts ...Options) flamego.Handler {
+func MultipartForm(model any, opts ...Options) flamego.Handler {
 	ensureNotPointer(model)
 
 	var opt Options
